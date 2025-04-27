@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "prismjs": "^1.30.0",
-    "solid-js": "^1.9.5"
+    "solid-js": "^1.9.5",
+    "solid-meta": "^0.28.1"
   }
 }
