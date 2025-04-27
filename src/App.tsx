@@ -30,14 +30,38 @@ const defaultIgnoredDirs = [
   "generated", "cache", ".cache", "build", ".build", "target"
 ];
 
+// Preset filters for common use cases
+const presetFilters = {
+  web: {
+    include: ["js", "ts", "jsx", "tsx", "css", "scss", "html", "vue", "svelte"],
+    exclude: ["min.js", "bundle.js", "vendor.js"]
+  },
+  docs: {
+    include: ["md", "txt", "rst", "adoc", "wiki", "org"],
+    exclude: ["node_modules", "vendor"]
+  },
+  config: {
+    include: ["json", "yaml", "yml", "toml", "ini", "env", "config"],
+    exclude: ["package-lock.json", "yarn.lock", "pnpm-lock.yaml"]
+  },
+  images: {
+    include: ["jpg", "jpeg", "png", "gif", "svg", "webp", "ico"],
+    exclude: ["node_modules"]
+  },
+  backend: {
+    include: ["py", "rb", "php", "java", "go", "rs", "cs", "cpp", "c"],
+    exclude: ["test", "spec", "vendor"]
+  }
+};
+
 // Preset templates
 const presetTemplates = [
   {
     name: "JavaScript/TypeScript",
     config: {
       searchLocation: "both" as const,
-      includedExtensions: ["js", "ts", "jsx", "tsx"],
-      excludedExtensions: [],
+      includedExtensions: presetFilters.web.include,
+      excludedExtensions: presetFilters.web.exclude,
       ignoredDirectories: [...defaultIgnoredDirs]
     }
   },
@@ -45,7 +69,7 @@ const presetTemplates = [
     name: "Documentation",
     config: {
       searchLocation: "file" as const,
-      includedExtensions: ["md", "txt", "pdf"],
+      includedExtensions: presetFilters.docs.include,
       excludedExtensions: [],
       ignoredDirectories: [...defaultIgnoredDirs]
     }
@@ -54,8 +78,26 @@ const presetTemplates = [
     name: "Configuration Files",
     config: {
       searchLocation: "folder" as const,
-      includedExtensions: ["json", "yaml", "yml", "toml", "ini", "env"],
+      includedExtensions: presetFilters.config.include,
+      excludedExtensions: presetFilters.config.exclude,
+      ignoredDirectories: [...defaultIgnoredDirs]
+    }
+  },
+  {
+    name: "Images",
+    config: {
+      searchLocation: "folder" as const,
+      includedExtensions: presetFilters.images.include,
       excludedExtensions: [],
+      ignoredDirectories: [...defaultIgnoredDirs]
+    }
+  },
+  {
+    name: "Backend Code",
+    config: {
+      searchLocation: "both" as const,
+      includedExtensions: presetFilters.backend.include,
+      excludedExtensions: presetFilters.backend.exclude,
       ignoredDirectories: [...defaultIgnoredDirs]
     }
   }
