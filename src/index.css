@@ -67,14 +67,24 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.subtitle-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.keyboard-hint a {
+  color: var(--text-muted);
+}
+
 /* Main app container */
 .app {
   max-width: 900px;
   margin: 0 auto;
+  /* Typography */
   padding: var(--space-32) var(--space-16);
 }
 
-/* Typography */
 h1 {
   font-size: 2.25rem;
   font-weight: 600;
