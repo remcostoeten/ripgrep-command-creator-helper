@@ -274,14 +274,35 @@ input[type="number"]:focus {
   font-weight: 500;
 }
 
+@keyframes shine {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+
 /* Command generation button */
 .generate-btn {
-  width: 100%;
-  padding: var(--space-12);
-  background: var(--accent-color);
-  border: none;
+  position: fixed;
+  bottom: var(--space-32);
+  right: var(--space-32);
+  width: auto;
+  padding: var(--space-12) var(--space-24);
+  background: var(--bg-color);
+  background-image: linear-gradient(
+    110deg,
+    var(--bg-color) 0%,
+    var(--bg-color) 40%,
+    rgba(255, 255, 255, 0.05) 50%,
+    var(--bg-color) 60%,
+    var(--bg-color) 100%
+  );
+  background-size: 200% auto;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-md);
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
@@ -290,20 +311,41 @@ input[type="number"]:focus {
   justify-content: center;
   gap: var(--space-8);
   transition: all var(--transition-normal) ease;
-  box-shadow: var(--shadow-sm);
-  margin-top: var(--space-16);
+  box-shadow: var(--shadow-md),
+              0 0 15px rgba(0, 0, 0, 0.3),
+              0 0 3px rgba(255, 255, 255, 0.05);
+  margin-top: 0;
+  z-index: 100;
+  animation: shine 8s linear infinite;
 }
 
 .generate-btn:hover {
-  background: var(--accent-hover);
+  background: var(--button-bg);
+  background-image: linear-gradient(
+    110deg,
+    var(--button-bg) 0%,
+    var(--button-bg) 40%,
+    rgba(255, 255, 255, 0.08) 50%,
+    var(--button-bg) 60%,
+    var(--button-bg) 100%
+  );
+  background-size: 200% auto;
+  border-color: var(--border-color);
+  color: var(--text-primary);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg),
+              0 0 20px rgba(0, 0, 0, 0.4),
+              0 0 5px rgba(255, 255, 255, 0.08);
+  animation: shine 4s linear infinite;
 }
 
 .generate-btn:active {
   transform: translateY(0);
-  background: var(--accent-color);
-  box-shadow: var(--shadow-sm);
+  background: var(--bg-color);
+  box-shadow: var(--shadow-md),
+              0 0 10px rgba(0, 0, 0, 0.2),
+              0 0 2px rgba(255, 255, 255, 0.03);
+  animation: none;
 }
 
 /* Command output styling */
@@ -340,8 +382,8 @@ input[type="number"]:focus {
   bottom: var(--space-32);
   left: 50%;
   transform: translateX(-50%) translateY(20px);
-  background: var(--accent-color);
-  color: var(--text-primary);
+  background: var(--bg-color);
+  color: var(--text-secondary);
   padding: var(--space-12) var(--space-24);
   border-radius: var(--radius-md);
   font-size: 0.95rem;
@@ -349,6 +391,7 @@ input[type="number"]:focus {
   z-index: 1000;
   opacity: 0;
   pointer-events: none;
+  border: 1px solid var(--border-subtle);
   transition: opacity var(--transition-normal) ease, 
               transform var(--transition-normal) cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -357,6 +400,9 @@ input[type="number"]:focus {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
   pointer-events: auto;
+  background: var(--bg-color);
+  border-color: var(--border-color);
+  color: var(--text-primary);
 }
 
 /* Syntax highlighting enhancements */
@@ -478,6 +524,12 @@ code[class*="language-"] {
     flex: 1 0 calc(50% - var(--space-8));
     justify-content: center;
     padding: var(--space-8);
+  }
+
+  .generate-btn {
+    bottom: var(--space-16);
+    right: var(--space-16);
+    padding: var(--space-8) var(--space-16);
   }
 }
 

@@ -367,9 +367,8 @@ export default function App() {
     <div class="app">
       <h1>Ripgrep Helper</h1>
       <p class="subtitle">
-        Build powerful ripgrep commands with this interactive UI. Press <kbd class="keyboard-shortcut">/</kbd> to focus search.
+        Build powerful ripgrep commands with this interactive UI. Press <kbd class="keyboard-shortcut">/</kbd> to focus search. Press <kbd class="keyboard-shortcut">Enter</kbd> to generate to clipboard.
       </p>
-
       <div class="form-container">
         <div class="form-group">
           <label>
@@ -520,7 +519,7 @@ export default function App() {
 
       <div class="keyboard-hint">
         Press <kbd>/</kbd> to focus search • Press <kbd>Enter</kbd> to generate
-      <p>Built by <a href="https://github.com/remcostoeten">Remco Stoeten</a>Utilizing <kbd>Solid.JS</kbd>   </p>
+      <p>Built by <a href="https://github.com/remcostoeten">Remco Stoeten</a> <span> utilizing </span><kbd>Solid.JS</kbd>   </p>
       </div>
       </div>
 

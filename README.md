@@ -2,8 +2,6 @@
 
 A modern, interactive web interface for building powerful ripgrep commands. Built with SolidJS and styled with a GitHub Dark-inspired theme.
 
-![Ripgrep Helper UI](https://raw.githubusercontent.com/remcostoeten/ripgrep-helperr/main/src/assets/preview.png)
-
 ## ✨ Features
 
 - 🎯 Interactive UI for building ripgrep commands
