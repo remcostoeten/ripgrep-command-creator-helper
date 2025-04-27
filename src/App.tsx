@@ -1,140 +1,50 @@
-import { createSignal, createEffect, onMount, For, Show } from 'solid-js';
-import { createStore } from 'solid-js/store';
-import './index.css';
 import { highlight, languages } from 'prismjs';
 import 'prismjs/components/prism-bash';
 import 'prismjs/themes/prism-tomorrow.css';
+import { createEffect, createSignal, For, onMount } from 'solid-js';
+import { createStore } from 'solid-js/store';
+import { Footer } from './components/layout/footer';
+import { Intro } from './components/layout/intro';
+import './index.css';
+import { FormState } from './core/types';
+import {
+  COMMON_EXTENSIONS,
+  COMMON_FOLERS,
+  DEFAULTR_IGNORED_DIRS,
+  SECTIONS,
+} from './core/constants';
 
-// Define the form state type
-type FormState = {
-  searchLocation: 'folder' | 'file' | 'both';
-  searchString: string;
-  matchType: 'exact' | 'contains';
-  includedExtensions: string[];
-  excludedExtensions: string[];
-  maxDaysAgo: number | null;
-  maxFileSize: number | null;
-  minFileSize: number | null;
-  ignoredDirectories: string[];
-  excludedFolders: string[];
-};
-
-// Common file extensions
-const commonExtensions = [
-  'js',
-  'ts',
-  'jsx',
-  'tsx',
-  'css',
-  'scss',
-  'html',
-  'md',
-  'json',
-  'yaml',
-  'yml',
-  'py',
-  'rb',
-  'go',
-  'rs',
-  'java',
-  'php',
-  'c',
-  'cpp',
-  'h',
-  'sh',
-  'txt',
-];
-
-// Common folders to exclude
-const commonFolders = [
-  'node_modules',
-  'dist',
-  '.git',
-  'build',
-  'coverage',
-  'tmp',
-  'temp',
-  'logs',
-  'public',
-  'assets',
-  'vendor',
-  'public',
-  'static',
-  'venv',
-  'cache',
-  '.cache',
-  '.vscode',
-  '.idea',
-];
-
-// Default ignored directories
-const defaultIgnoredDirs = [
-  'node_modules',
-  '.git',
-  '.vite',
-  '.next',
-  'dist',
-  '.dist',
-  'generated',
-  'cache',
-  '.cache',
-  'build',
-  '.build',
-  'target',
-  'vendor',
-  'public',
-  'static',
-  'venv',
-  'cache',
-  '.cache',
-];
-
-// Preset templates
+const commonExtensions = COMMON_EXTENSIONS;
 const presetTemplates = [
   {
-    name: 'JavaScript/TypeScript',
+    name: 'Source Code',
+    searchLocation: 'folder' as const,
+    includedExtensions: ['js', 'ts', 'jsx', 'tsx'],
     config: {
-      searchLocation: 'both' as const,
+      searchLocation: 'folder' as 'folder' | 'file' | 'both',
       includedExtensions: ['js', 'ts', 'jsx', 'tsx'],
-      excludedExtensions: [],
-      ignoredDirectories: [...defaultIgnoredDirs],
     },
   },
   {
     name: 'Documentation',
+    searchLocation: 'file' as const,
+    includedExtensions: ['md', 'txt', 'pdf'],
     config: {
-      searchLocation: 'file' as const,
+      searchLocation: 'file' as 'folder' | 'file' | 'both',
       includedExtensions: ['md', 'txt', 'pdf'],
-      excludedExtensions: [],
-      ignoredDirectories: [...defaultIgnoredDirs],
     },
   },
   {
     name: 'Configuration Files',
+    searchLocation: 'folder' as const,
+    includedExtensions: ['json', 'yaml', 'yml', 'toml'],
     config: {
-      searchLocation: 'folder' as const,
-      includedExtensions: ['json', 'yaml', 'yml', 'toml', 'ini', 'env'],
-      excludedExtensions: [],
-      ignoredDirectories: [...defaultIgnoredDirs],
+      searchLocation: 'folder' as 'folder' | 'file' | 'both',
+      includedExtensions: ['json', 'yaml', 'yml', 'toml'],
     },
   },
 ];
-
-// Add section definitions for quick navigation
-const sections = [
-  { id: 'search-section', label: 'Search', shortcut: 'Alt+1' },
-  { id: 'search-location-section', label: 'Location', shortcut: 'Alt+2' },
-  { id: 'match-type-section', label: 'Match Type', shortcut: 'Alt+3' },
-  { id: 'file-size-section', label: 'File Size', shortcut: 'Alt+4' },
-  { id: 'days-ago-section', label: 'Days Ago', shortcut: 'Alt+5' },
-  { id: 'extensions-section', label: 'Extensions', shortcut: 'Alt+6' },
-  { id: 'ignored-dirs-section', label: 'Ignored Dirs', shortcut: 'Alt+7' },
-  { id: 'templates-section', label: 'Templates', shortcut: 'Alt+8' },
-  { id: 'exclude-folders-section', label: 'Exclude Folders', shortcut: 'Alt+9' },
-];
-
 export default function App() {
-  // Initialize form state with defaults
   const [formState, setFormState] = createStore<FormState>({
     searchLocation: 'both',
     searchString: '',
@@ -144,20 +54,37 @@ export default function App() {
     maxDaysAgo: null,
     maxFileSize: null,
     minFileSize: null,
-    ignoredDirectories: [...defaultIgnoredDirs],
+    ignoredDirectories: [...DEFAULTR_IGNORED_DIRS],
     excludedFolders: [],
+    caseSensitivity: 'smart',
+    searchOptions: {
+      hidden: false,
+      binary: false,
+      followSymlinks: false,
+      multiline: false,
+      wordMatch: false,
+      invertMatch: false,
+    },
+    context: {
+      before: 0,
+      after: 0,
+      lines: 0,
+    },
   });
-
-  const [showCopiedMessage, setShowCopiedMessage] = createSignal(false);
+  const [isDarkTheme, setIsDarkTheme] = createSignal(true);
   const [showGeneratedMessage, setShowGeneratedMessage] = createSignal(false);
   const [toastMessage, setToastMessage] = createSignal('');
   const [generatedCommand, setGeneratedCommand] = createSignal('');
   const [highlightedCommand, setHighlightedCommand] = createSignal('');
-  const [activeSection, setActiveSection] = createSignal('');
   const [newFolderInput, setNewFolderInput] = createSignal('');
-
-  // Load saved state from localStorage on mount
-  onMount(() => {
+  const [showCommandDisplay, setShowCommandDisplay] = createSignal(false);
+  const [setFocusedSection] = createSignal('');
+  onMount(function () {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      setIsDarkTheme(savedTheme === 'dark');
+      document.body.classList.toggle('light-theme', savedTheme === 'light');
+    }
     const savedState = localStorage.getItem('ripgrepHelperState');
     if (savedState) {
       try {
@@ -167,23 +94,31 @@ export default function App() {
         console.error('Failed to parse saved state:', e);
       }
     }
-
-    // Set up keyboard shortcuts
+    document.querySelectorAll('.form-group').forEach(function (group) {
+      const buttons = group.querySelectorAll('button:not([tabindex])');
+      const inputs = group.querySelectorAll('input:not([tabindex])');
+      const labels = group.querySelectorAll('label:not([tabindex])');
+      buttons.forEach(function (button) {
+        button.setAttribute('tabindex', '0');
+      });
+      inputs.forEach(function (input) {
+        input.setAttribute('tabindex', '0');
+      });
+      labels.forEach(function (label) {
+        if (label.querySelector('input')) {
+          label.setAttribute('tabindex', '0');
+        }
+      });
+    });
     window.addEventListener('keydown', handleKeyDown);
-
-    // Auto focus the first input
     const firstInput = document.getElementById('search-string');
     if (firstInput) {
       firstInput.focus();
     }
-
-    // Generate command on initial load
     generateRipgrepCommand();
-
-    // Add intersection observer to track visible sections
     const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
+      function (entries) {
+        entries.forEach(function (entry) {
           if (entry.isIntersecting) {
             setActiveSection(entry.target.id);
           }
@@ -191,24 +126,38 @@ export default function App() {
       },
       { threshold: 0.5 }
     );
-
-    sections.forEach((section) => {
+    SECTIONS.forEach(function (section) {
       const element = document.getElementById(section.id);
       if (element) observer.observe(element);
     });
-
-    return () => {
+    return function () {
       window.removeEventListener('keydown', handleKeyDown);
     };
   });
 
-  // Save state to localStorage whenever it changes
-  createEffect(() => {
-    localStorage.setItem('ripgrepHelperState', JSON.stringify(formState));
-  });
+  function setActiveSection(sectionId: string): void {
+    const prevFocused = document.querySelector('.form-group.focused');
+    if (prevFocused) {
+      prevFocused.classList.remove('focused');
+    }
+    const section = document.getElementById(sectionId);
+    if (section) {
+      const formGroup = section.closest('.form-group');
+      if (formGroup) {
+        formGroup.classList.add('focused');
+        setTimeout(function () {
+          formGroup.classList.remove('focused');
+        }, 500);
+      }
+      section.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  }
 
-  // Update highlighted command whenever generated command changes
-  createEffect(() => {
+  createEffect(function () {
+    localStorage.setItem('ripgrepHelperState', JSON.stringify(formState));
     const cmd = generatedCommand();
     if (cmd) {
       try {
@@ -221,153 +170,188 @@ export default function App() {
     }
   });
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    // Focus search input on '/'
+  function focusSection(sectionId: string): void {
+    const prevFocused = document.querySelector('.form-group.focused');
+    if (prevFocused) {
+      prevFocused.classList.remove('focused');
+    }
+    const section = document.getElementById(sectionId);
+    if (section) {
+      const formGroup = section.closest('.form-group');
+      if (formGroup) {
+        formGroup.classList.add('focused');
+        setTimeout(function () {
+          formGroup.classList.remove('focused');
+        }, 500);
+      }
+      section.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+      const focusableElements = section.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusableElements.length > 0) {
+        (focusableElements[0] as HTMLElement).focus();
+      }
+      setFocusedSection();
+    }
+  }
+  function handleKeyDown(e: KeyboardEvent): void {
     if (e.key === '/' && !isInputFocused()) {
       e.preventDefault();
-      const searchInput = document.getElementById('search-string');
-      if (searchInput) searchInput.focus();
+      focusSection('search-section');
     }
-
-    // Generate command on Enter if not in a textarea or input
-    if (e.key === 'Enter' && !isTextareaFocused()) {
-      e.preventDefault();
-      generateRipgrepCommand(true);
-    }
-
-    // Alt + number shortcuts
-    if (e.altKey && !isNaN(parseInt(e.key)) && parseInt(e.key) >= 1 && parseInt(e.key) <= 9) {
-      e.preventDefault();
-      const index = parseInt(e.key) - 1;
-      const inputs = document.querySelectorAll('input, select');
-      if (inputs[index]) {
-        (inputs[index] as HTMLElement).focus();
+    if (e.key === 'Tab') {
+      const currentSection = document.activeElement?.closest('.form-group');
+      if (currentSection) {
+        currentSection.classList.add('focused');
+        setTimeout(function () {
+          currentSection.classList.remove('focused');
+        }, 500);
       }
     }
-  };
+    if (e.key === 'Enter' && !isTextareaFocused()) {
+      generateRipgrepCommand(true);
+    }
+    if (e.altKey) {
+      let sectionId: string | undefined;
+      switch (e.key.toLowerCase()) {
+        case '1':
+          sectionId = 'search-section';
+          break;
+        case '2':
+          sectionId = 'search-location-section';
+          break;
+        case '3':
+          sectionId = 'match-type-section';
+          break;
+        case '4':
+          sectionId = 'file-size-section';
+          break;
+        case '5':
+          sectionId = 'days-ago-section';
+          break;
+        case '6':
+          sectionId = 'extensions-section';
+          break;
+        case '7':
+          sectionId = 'ignored-dirs-section';
+          break;
+        case '8':
+          sectionId = 'templates-section';
+          break;
+        case '9':
+          sectionId = 'exclude-folders-section';
+          break;
+        case 'c':
+          sectionId = 'case-sensitivity-section';
+          break;
+        case 'o':
+          sectionId = 'search-options-section';
+          break;
+        case 'l':
+          sectionId = 'context-lines-section';
+          break;
+      }
+      if (sectionId) {
+        e.preventDefault();
+        focusSection(sectionId);
+      }
+    } // Remove focus class after animation
 
-  const isInputFocused = () => {
-    return (
-      document.activeElement instanceof HTMLInputElement ||
-      document.activeElement instanceof HTMLSelectElement ||
-      document.activeElement instanceof HTMLTextAreaElement
-    );
-  };
-
-  const isTextareaFocused = () => {
+    document.activeElement instanceof HTMLInputElement ||
+    document.activeElement instanceof HTMLSelectElement ||
+    document.activeElement instanceof HTMLTextAreaElement
+      ? document.activeElement.blur()
+      : null;
+  }
+  function isInputFocused(): boolean {
+    return document.activeElement instanceof HTMLInputElement;
+  }
+  function isTextareaFocused(): boolean {
     return document.activeElement instanceof HTMLTextAreaElement;
-  };
-
-  const applyTemplate = (templateIndex: number) => {
+  }
+  function applyTemplate(templateIndex: number): void {
     const template = presetTemplates[templateIndex];
     setFormState({
-      ...formState,
-      ...template.config,
+      searchLocation: template.config.searchLocation,
+      includedExtensions: template.config.includedExtensions,
     });
-    // Generate command after applying template
     setTimeout(generateRipgrepCommand, 0);
-  };
+  }
 
-  const toggleExtension = (ext: string, type: 'include' | 'exclude') => {
+  function toggleExtension(ext: string, type: 'include' | 'exclude'): void {
     if (type === 'include') {
       const included = [...formState.includedExtensions];
       const index = included.indexOf(ext);
-
       if (index === -1) {
         included.push(ext);
       } else {
         included.splice(index, 1);
       }
-
       setFormState('includedExtensions', included);
-
-      // Remove from excluded if it's being included
-      if (index === -1) {
-        const excluded = [...formState.excludedExtensions];
-        const excludedIndex = excluded.indexOf(ext);
-        if (excludedIndex !== -1) {
-          excluded.splice(excludedIndex, 1);
-          setFormState('excludedExtensions', excluded);
-        }
+      const excluded = [...formState.excludedExtensions];
+      const excludedIndex = excluded.indexOf(ext);
+      if (excludedIndex !== -1) {
+        excluded.splice(excludedIndex, 1);
+        setFormState('excludedExtensions', excluded);
       }
     } else {
       const excluded = [...formState.excludedExtensions];
       const index = excluded.indexOf(ext);
-
       if (index === -1) {
         excluded.push(ext);
       } else {
         excluded.splice(index, 1);
       }
-
       setFormState('excludedExtensions', excluded);
-
-      // Remove from included if it's being excluded
-      if (index === -1) {
-        const included = [...formState.includedExtensions];
-        const includedIndex = included.indexOf(ext);
-        if (includedIndex !== -1) {
-          included.splice(includedIndex, 1);
-          setFormState('includedExtensions', included);
-        }
+      const included = [...formState.includedExtensions];
+      const includedIndex = included.indexOf(ext);
+      if (includedIndex !== -1) {
+        included.splice(includedIndex, 1);
+        setFormState('includedExtensions', included);
       }
     }
-
-    // Generate command after toggling extension
-    setTimeout(generateRipgrepCommand, 0);
-  };
-
-  const toggleAllExtensions = (type: 'include' | 'exclude', select: boolean) => {
+  }
+  function toggleAllExtensions(type: 'include' | 'exclude', select: boolean): void {
     if (type === 'include') {
       if (select) {
-        setFormState('includedExtensions', [...commonExtensions]);
+        setFormState('includedExtensions', [...COMMON_EXTENSIONS]);
         setFormState('excludedExtensions', []);
       } else {
         setFormState('includedExtensions', []);
       }
     } else {
       if (select) {
-        setFormState('excludedExtensions', [...commonExtensions]);
+        setFormState('excludedExtensions', [...COMMON_EXTENSIONS]);
         setFormState('includedExtensions', []);
       } else {
         setFormState('excludedExtensions', []);
       }
     }
-    // Generate command after toggling all extensions
-    setTimeout(generateRipgrepCommand, 0);
-  };
-
-  const toggleIgnoredDirectory = (dir: string) => {
+  }
+  function toggleIgnoredDirectory(dir: string): void {
     const ignored = [...formState.ignoredDirectories];
     const index = ignored.indexOf(dir);
-
     if (index === -1) {
       ignored.push(dir);
     } else {
       ignored.splice(index, 1);
     }
-
     setFormState('ignoredDirectories', ignored);
-
-    // Generate command after toggling directory
-    setTimeout(generateRipgrepCommand, 0);
-  };
-
-  const toggleFolder = (folder: string) => {
+  }
+  function toggleFolder(folder: string): void {
     const excluded = [...formState.excludedFolders];
     const index = excluded.indexOf(folder);
-
     if (index === -1) {
       excluded.push(folder);
     } else {
       excluded.splice(index, 1);
     }
-
     setFormState('excludedFolders', excluded);
-    setTimeout(generateRipgrepCommand, 0);
-  };
-
-  const addCustomFolder = (e: Event) => {
+  }
+  function addCustomFolder(e: Event): void {
     e.preventDefault();
     const folder = newFolderInput().trim();
     if (folder && !formState.excludedFolders.includes(folder)) {
@@ -375,150 +359,155 @@ export default function App() {
       setNewFolderInput('');
       setTimeout(generateRipgrepCommand, 0);
     }
-  };
-
-  const toggleAllFolders = (select: boolean) => {
+  }
+  function toggleAllFolders(select: boolean): void {
     if (select) {
-      setFormState('excludedFolders', [...commonFolders]);
+      setFormState('excludedFolders', [...COMMON_FOLERS]);
     } else {
       setFormState('excludedFolders', []);
     }
-    setTimeout(generateRipgrepCommand, 0);
-  };
-
-  const showToast = (message: string, duration = 3000) => {
+  }
+  function showToast(message: string, duration = 3000): void {
     setToastMessage(message);
     setShowGeneratedMessage(true);
-    setTimeout(() => setShowGeneratedMessage(false), duration);
-  };
-
-  const generateRipgrepCommand = (shouldShowToast = false) => {
+    setTimeout(function () {
+      setShowGeneratedMessage(false);
+    }, duration);
+  }
+  function generateRipgrepCommand(shouldShowToast = false): string {
     let command = 'rg';
-
-    // Search type
-    if (formState.matchType === 'exact') {
-      command += ' -F'; // Fixed strings, no regex
+    switch (formState.caseSensitivity) {
+      case 'sensitive':
+        command += ' -s';
+        break;
+      case 'insensitive':
+        command += ' -i';
+        break;
+      case 'smart':
+        command += ' -S';
+        break;
     }
-
-    // Case sensitivity (default is case-sensitive)
-    command += ' -s';
-
-    // File extensions to include
+    if (formState.matchType === 'exact') {
+      command += ' -F';
+    } else if (formState.matchType === 'regex') {
+      command += ' -e';
+    }
+    if (formState.searchOptions.hidden) command += ' --hidden';
+    if (formState.searchOptions.binary) command += ' --text';
+    if (formState.searchOptions.followSymlinks) command += ' --follow';
+    if (formState.searchOptions.multiline) command += ' --multiline';
+    if (formState.searchOptions.wordMatch) command += ' --word-regexp';
+    if (formState.searchOptions.invertMatch) command += ' --invert-match';
+    if (formState.context.before > 0) command += ` -B ${formState.context.before}`;
+    if (formState.context.after > 0) command += ` -A ${formState.context.after}`;
+    if (formState.context.lines > 0) command += ` -C ${formState.context.lines}`;
     if (formState.includedExtensions.length > 0) {
-      formState.includedExtensions.forEach((ext) => {
+      formState.includedExtensions.forEach(function (ext) {
         command += ` -g '*.${ext}'`;
       });
     }
-
-    // File extensions to exclude
     if (formState.excludedExtensions.length > 0) {
-      formState.excludedExtensions.forEach((ext) => {
+      formState.excludedExtensions.forEach(function (ext) {
         command += ` -g '!*.${ext}'`;
       });
     }
-
-    // Ignored directories
     if (formState.ignoredDirectories.length > 0) {
-      formState.ignoredDirectories.forEach((dir) => {
+      formState.ignoredDirectories.forEach(function (dir) {
         command += ` -g '!${dir}/**'`;
       });
     }
-
-    // File size constraints - add these BEFORE the search pattern
     if (formState.minFileSize !== null && formState.minFileSize > 0) {
       command += ` --max-filesize ${formState.minFileSize}`;
     }
     if (formState.maxFileSize !== null && formState.maxFileSize > 0) {
       command += ` --max-filesize ${formState.maxFileSize}`;
     }
-
-    // Max days ago (file modification time)
     if (formState.maxDaysAgo !== null && formState.maxDaysAgo > 0) {
       command += ' --glob-case-insensitive';
       const daysInSeconds = formState.maxDaysAgo * 24 * 60 * 60;
-      command += ` -g '!{**/,}*.[mt][ti][mm][ee]<${daysInSeconds}'`; // Removed semicolon
+      command += ` -g '!{**/,}*.[mt][ti][mm][ee]<${daysInSeconds}'`;
     }
-
-    // Search string - must be the last argument
     if (formState.searchString) {
       command += ` '${formState.searchString}'`;
-    } else {
-      command += ` '.'`; // Use '.' as default pattern to match any character instead of empty string
     }
-
-    // Search location
+    command += " '.'";
     if (formState.searchLocation === 'folder') {
-      command += ' -l'; // Only print filenames
+      command += ' -l';
     } else if (formState.searchLocation === 'file') {
-      command += ''; // Default behavior searches file contents
+      command += '';
     }
-
-    // Add excluded folders
     if (formState.excludedFolders.length > 0) {
-      formState.excludedFolders.forEach((folder) => {
+      formState.excludedFolders.forEach(function (folder) {
         command += ` -g '!${folder}/**'`;
       });
     }
-
     setGeneratedCommand(command);
-
     if (shouldShowToast) {
-      navigator.clipboard.writeText(command).then(() => {
+      navigator.clipboard.writeText(command).then(function () {
         showToast('Command generated and copied to clipboard! 🚀');
+        setShowCommandDisplay(true);
+        setTimeout(function () {
+          setShowCommandDisplay(false);
+        }, 5000);
       });
     }
-
     return command;
-  };
-
-  const handleGenerateClick = () => {
+  }
+  function handleGenerateClick(): void {
     generateRipgrepCommand(true);
-  };
-
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(generatedCommand()).then(() => {
-      setShowCopiedMessage(true);
-      setTimeout(() => setShowCopiedMessage(false), 3000);
+  }
+  function copyToClipboard(): void {
+    navigator.clipboard.writeText(generatedCommand()).then(function () {
+      showToast('Command copied to clipboard! 📋');
     });
-  };
-
-  const scrollToSection = (sectionId: string) => {
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setActiveSection(sectionId);
-    }
-  };
-
+  }
+  function toggleTheme() {
+    const newTheme = !isDarkTheme();
+    setIsDarkTheme(newTheme);
+    document.body.classList.toggle('light-theme', !newTheme);
+    localStorage.setItem('theme', newTheme ? 'dark' : 'light');
+  }
   return (
     <div class="app">
-      <h1>Ripgrep Helper</h1>
-      <p class="subtitle">
-        Build powerful ripgrep commands with this interactive UI. Press{' '}
-        <kbd class="keyboard-shortcut">/</kbd> to focus search. Press{' '}
-        <kbd class="keyboard-shortcut">Enter</kbd> to generate to clipboard.
-      </p>
       <div class="form-container">
-        <div class="form-group">
-          <label>
-            Search String
-            <span class="shortcut-label">Alt+1</span>
-          </label>
-          <div class="search-input-wrapper">
-            <input
-              id="search-string"
-              type="text"
-              value={formState.searchString}
-              onInput={(e) => {
-                setFormState('searchString', e.target.value);
-                generateRipgrepCommand(false);
-              }}
-              placeholder="Enter search term..."
-            />
+        <button
+          class="theme-toggle"
+          onClick={toggleTheme}
+          title={isDarkTheme() ? 'Switch to light theme' : 'Switch to dark theme'}
+        >
+          {isDarkTheme() ? '☀️' : '🌙'}
+        </button>
+        <div class="command-display" classList={{ visible: showCommandDisplay() }}>
+          <div class="command-display-inner">
+            <div class="command-display-text">
+              <div innerHTML={highlightedCommand()} />
+            </div>
+            <button class="command-display-copy" onClick={copyToClipboard}>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+              Copy
+            </button>
           </div>
         </div>
-
-        <div class="form-group">
+        <Intro
+          formState={formState}
+          setFormState={setFormState}
+          generateRipgrepCommand={generateRipgrepCommand}
+        />
+        <div class="form-groups" style={{ 'padding-bottom': '100px' }} />
+        <div class="form-group" id="search-location-section">
           <label>
             Search Location
             <span class="shortcut-label">Alt+2</span>
@@ -528,7 +517,7 @@ export default function App() {
               <input
                 type="radio"
                 checked={formState.searchLocation === 'both'}
-                onChange={() => {
+                onChange={function () {
                   setFormState('searchLocation', 'both');
                   generateRipgrepCommand(false);
                 }}
@@ -539,7 +528,7 @@ export default function App() {
               <input
                 type="radio"
                 checked={formState.searchLocation === 'folder'}
-                onChange={() => {
+                onChange={function () {
                   setFormState('searchLocation', 'folder');
                   generateRipgrepCommand(false);
                 }}
@@ -550,7 +539,7 @@ export default function App() {
               <input
                 type="radio"
                 checked={formState.searchLocation === 'file'}
-                onChange={() => {
+                onChange={function () {
                   setFormState('searchLocation', 'file');
                   generateRipgrepCommand(false);
                 }}
@@ -559,8 +548,7 @@ export default function App() {
             </label>
           </div>
         </div>
-
-        <div class="form-group">
+        <div class="form-group" id="match-type-section">
           <label>
             Match Type
             <span class="shortcut-label">Alt+3</span>
@@ -570,7 +558,7 @@ export default function App() {
               <input
                 type="radio"
                 checked={formState.matchType === 'contains'}
-                onChange={() => {
+                onChange={function () {
                   setFormState('matchType', 'contains');
                   generateRipgrepCommand(false);
                 }}
@@ -581,148 +569,412 @@ export default function App() {
               <input
                 type="radio"
                 checked={formState.matchType === 'exact'}
-                onChange={() => {
+                onChange={function () {
                   setFormState('matchType', 'exact');
                   generateRipgrepCommand(false);
                 }}
               />
               Exact
             </label>
+            <label class="radio-option">
+              <input
+                type="radio"
+                checked={formState.matchType === 'regex'}
+                onChange={function () {
+                  setFormState('matchType', 'regex');
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Regex
+            </label>
           </div>
         </div>
-
-        <div class="form-group">
+        <div class="form-group" id="file-size-section">
           <label>
-            Include Extensions
+            File Size
             <span class="shortcut-label">Alt+4</span>
           </label>
-          <div class="extensions-controls">
-            <button
-              type="button"
-              class="select-all-btn"
-              onClick={() => toggleAllExtensions('include', true)}
-            >
-              Select All
-            </button>
-            <button
-              type="button"
-              class="select-all-btn"
-              onClick={() => toggleAllExtensions('include', false)}
-            >
-              Clear All
-            </button>
-          </div>
-          <div class="extensions-grid">
-            <For each={commonExtensions}>
-              {(ext) => (
-                <button
-                  type="button"
-                  class="extension-btn"
-                  classList={{ selected: formState.includedExtensions.includes(ext) }}
-                  onClick={() => toggleExtension(ext, 'include')}
-                >
-                  {ext}
-                </button>
-              )}
-            </For>
+          <div class="file-size-inputs">
+            <div class="input-group">
+              <label>Min</label>
+              <input
+                type="number"
+                min="0"
+                value={formState.minFileSize || 0}
+                onChange={function (e) {
+                  setFormState('minFileSize', parseInt(e.target.value) || null);
+                  generateRipgrepCommand(false);
+                }}
+              />
+            </div>
+            <div class="input-group">
+              <label>Max</label>
+              <input
+                type="number"
+                min="0"
+                value={formState.maxFileSize || 0}
+                onChange={function (e) {
+                  setFormState('maxFileSize', parseInt(e.target.value) || null);
+                  generateRipgrepCommand(false);
+                }}
+              />
+            </div>
           </div>
         </div>
-
-        <div class="form-group">
+        <div class="form-group" id="days-ago-section">
           <label>
-            Exclude Extensions
+            Days Ago
             <span class="shortcut-label">Alt+5</span>
+          </label>
+          <div class="input-group">
+            <input
+              type="number"
+              min="0"
+              value={formState.maxDaysAgo || 0}
+              onChange={function (e) {
+                setFormState('maxDaysAgo', parseInt(e.target.value) || null);
+                generateRipgrepCommand(false);
+              }}
+            />
+          </div>
+        </div>
+        <div class="form-group" id="extensions-section">
+          <label>
+            Extensions
+            <span class="shortcut-label">Alt+6</span>
           </label>
           <div class="extensions-controls">
             <button
               type="button"
               class="select-all-btn"
-              onClick={() => toggleAllExtensions('exclude', true)}
+              onClick={function () {
+                toggleAllExtensions('include', true);
+              }}
             >
               Select All
             </button>
             <button
               type="button"
-              class="select-all-btn"
-              onClick={() => toggleAllExtensions('exclude', false)}
+              class="clear-all-btn"
+              onClick={function () {
+                toggleAllExtensions('include', false);
+              }}
             >
               Clear All
             </button>
           </div>
           <div class="extensions-grid">
             <For each={commonExtensions}>
-              {(ext) => (
-                <button
-                  type="button"
-                  class="extension-btn"
-                  classList={{ selected: formState.excludedExtensions.includes(ext) }}
-                  onClick={() => toggleExtension(ext, 'exclude')}
-                >
-                  {ext}
-                </button>
-              )}
+              {function (ext) {
+                return (
+                  <button
+                    type="button"
+                    class="extension-btn"
+                    classList={{ selected: formState.includedExtensions.includes(ext) }}
+                    onClick={function () {
+                      toggleExtension(ext, 'include');
+                    }}
+                  >
+                    {ext}
+                  </button>
+                );
+              }}
             </For>
           </div>
         </div>
-
-        <div class="form-group">
+        <div class="form-group" id="ignored-dirs-section">
+          <label>
+            Ignored Dirs
+            <span class="shortcut-label">Alt+7</span>
+          </label>
+          <div class="extensions-controls">
+            <button
+              type="button"
+              class="select-all-btn"
+              onClick={function () {
+                toggleAllExtensions('exclude', true);
+              }}
+            >
+              Select All
+            </button>
+            <button
+              type="button"
+              class="clear-all-btn"
+              onClick={function () {
+                toggleAllExtensions('exclude', false);
+              }}
+            >
+              Clear All
+            </button>
+          </div>
+          <div class="extensions-grid">
+            <For each={commonExtensions}>
+              {function (ext) {
+                return (
+                  <button
+                    type="button"
+                    class="extension-btn"
+                    classList={{ selected: formState.excludedExtensions.includes(ext) }}
+                    onClick={function () {
+                      toggleExtension(ext, 'exclude');
+                    }}
+                  >
+                    {ext}
+                  </button>
+                );
+              }}
+            </For>
+          </div>
+        </div>
+        <div class="form-group" id="templates-section">
+          <label>
+            Templates
+            <span class="shortcut-label">Alt+8</span>
+          </label>
+          <div class="templates-controls">
+            <button
+              type="button"
+              class="select-all-btn"
+              onClick={function () {
+                applyTemplate(0);
+              }}
+            >
+              JavaScript/TypeScript
+            </button>
+            <button
+              type="button"
+              class="select-all-btn"
+              onClick={function () {
+                applyTemplate(1);
+              }}
+            >
+              Documentation
+            </button>
+            <button
+              type="button"
+              class="select-all-btn"
+              onClick={function () {
+                applyTemplate(2);
+              }}
+            >
+              Configuration Files
+            </button>
+          </div>
+        </div>
+        <div class="form-group" id="exclude-folders-section">
           <label>
             Exclude Folders
             <span class="shortcut-label">Alt+9</span>
           </label>
           <div class="extensions-controls">
-            <button type="button" class="select-all-btn" onClick={() => toggleAllFolders(true)}>
+            <button
+              type="button"
+              class="select-all-btn"
+              onClick={function () {
+                toggleAllFolders(true);
+              }}
+            >
               Select All
             </button>
-            <button type="button" class="select-all-btn" onClick={() => toggleAllFolders(false)}>
+            <button
+              type="button"
+              class="clear-all-btn"
+              onClick={function () {
+                toggleAllFolders(false);
+              }}
+            >
               Clear All
             </button>
           </div>
           <div class="folders-grid">
-            <For each={commonFolders}>
-              {(folder) => (
-                <button
-                  type="button"
-                  class="folder-btn"
-                  classList={{ selected: formState.excludedFolders.includes(folder) }}
-                  onClick={() => toggleFolder(folder)}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
+            <For each={COMMON_FOLERS}>
+              {function (folder) {
+                return (
+                  <button
+                    type="button"
+                    class="folder-btn"
+                    classList={{ selected: formState.excludedFolders.includes(folder) }}
+                    onClick={function () {
+                      toggleFolder(folder);
+                    }}
                   >
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                  </svg>
-                  {folder}
-                </button>
-              )}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                    </svg>
+                    {folder}
+                  </button>
+                );
+              }}
             </For>
           </div>
-          <form class="add-folder-form" onSubmit={addCustomFolder}>
-            <input
-              type="text"
-              class="add-folder-input"
-              value={newFolderInput()}
-              onInput={(e) => setNewFolderInput(e.currentTarget.value)}
-              placeholder="Add custom folder..."
-            />
-            <button type="submit" class="add-folder-btn">
-              Add
-            </button>
-          </form>
         </div>
-
-        <Show when={generatedCommand()}>
-          <div class="command-output">
-            <div innerHTML={highlightedCommand()}></div>
+        <div class="form-group" id="case-sensitivity-section">
+          <label>
+            Case Sensitivity
+            <span class="shortcut-label">Alt+C</span>
+          </label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input
+                type="radio"
+                checked={formState.caseSensitivity === 'sensitive'}
+                onChange={function () {
+                  setFormState('caseSensitivity', 'sensitive');
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Sensitive
+            </label>
+            <label class="radio-option">
+              <input
+                type="radio"
+                checked={formState.caseSensitivity === 'insensitive'}
+                onChange={function () {
+                  setFormState('caseSensitivity', 'insensitive');
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Ignore Case
+            </label>
+            <label class="radio-option">
+              <input
+                type="radio"
+                checked={formState.caseSensitivity === 'smart'}
+                onChange={function () {
+                  setFormState('caseSensitivity', 'smart');
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Smart Case
+            </label>
           </div>
-        </Show>
-
+        </div>
+        <div class="form-group" id="search-options-section">
+          <label>
+            Search Options
+            <span class="shortcut-label">Alt+O</span>
+          </label>
+          <div class="checkbox-grid">
+            <label class="checkbox-option">
+              <input
+                type="checkbox"
+                checked={formState.searchOptions.hidden}
+                onChange={(e) => {
+                  setFormState('searchOptions', 'hidden', e.target.checked);
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Search Hidden Files
+            </label>
+            <label class="checkbox-option">
+              <input
+                type="checkbox"
+                checked={formState.searchOptions.binary}
+                onChange={(e) => {
+                  setFormState('searchOptions', 'binary', e.target.checked);
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Search Binary Files
+            </label>
+            <label class="checkbox-option">
+              <input
+                type="checkbox"
+                checked={formState.searchOptions.followSymlinks}
+                onChange={(e) => {
+                  setFormState('searchOptions', 'followSymlinks', e.target.checked);
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Follow Symlinks
+            </label>
+            <label class="checkbox-option">
+              <input
+                type="checkbox"
+                checked={formState.searchOptions.multiline}
+                onChange={(e) => {
+                  setFormState('searchOptions', 'multiline', e.target.checked);
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Multiline Search
+            </label>
+            <label class="checkbox-option">
+              <input
+                type="checkbox"
+                checked={formState.searchOptions.wordMatch}
+                onChange={(e) => {
+                  setFormState('searchOptions', 'wordMatch', e.target.checked);
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Word Boundaries
+            </label>
+            <label class="checkbox-option">
+              <input
+                type="checkbox"
+                checked={formState.searchOptions.invertMatch}
+                onChange={(e) => {
+                  setFormState('searchOptions', 'invertMatch', e.target.checked);
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Invert Match
+            </label>
+          </div>
+        </div>
+        <div class="form-group" id="context-lines-section">
+          <label>
+            Context Lines
+            <span class="shortcut-label">Alt+L</span>
+          </label>
+          <div class="context-inputs">
+            <div class="input-group">
+              <label>Before</label>
+              <input
+                type="number"
+                min="0"
+                value={formState.context.before}
+                onChange={function (e) {
+                  setFormState('context', 'before', parseInt(e.target.value) || 0);
+                  generateRipgrepCommand(false);
+                }}
+              />
+            </div>
+            <div class="input-group">
+              <label>After</label>
+              <input
+                type="number"
+                min="0"
+                value={formState.context.after}
+                onChange={function (e) {
+                  setFormState('context', 'after', parseInt(e.target.value) || 0);
+                  generateRipgrepCommand(false);
+                }}
+              />
+            </div>
+            <div class="input-group">
+              <label>Both</label>
+              <input
+                type="number"
+                min="0"
+                value={formState.context.lines}
+                onChange={function (e) {
+                  setFormState('context', 'lines', parseInt(e.target.value) || 0);
+                  generateRipgrepCommand(false);
+                }}
+              />
+            </div>
+          </div>
+        </div>
         <button class="generate-btn" onClick={handleGenerateClick}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -735,23 +987,15 @@ export default function App() {
             stroke-linecap="round"
             stroke-linejoin="round"
           >
-            <path d="M20 16.7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7.3a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v7.4Z"></path>
+            <path d="M20 16.7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7.3a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v7.4Z" />
           </svg>
           Generate Command
+          <kbd class="generate-kbd">↵</kbd>
         </button>
-
-        <div class="keyboard-hint">
-          Press <kbd>/</kbd> to focus search • Press <kbd>Enter</kbd> to generate
-          <p>
-            Built by <a href="https://github.com/remcostoeten">Remco Stoeten</a>{' '}
-            <span> utilizing </span>
-            <kbd>Solid.JS</kbd>{' '}
-          </p>
+        <Footer />
+        <div class="toast" classList={{ visible: showGeneratedMessage() }}>
+          {toastMessage()}
         </div>
-      </div>
-
-      <div class="toast" classList={{ visible: showGeneratedMessage() }}>
-        {toastMessage()}
       </div>
     </div>
   );
