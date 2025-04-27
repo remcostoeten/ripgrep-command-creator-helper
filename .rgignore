@@ -1,0 +1,12 @@
+node_modules/**
+.git/**
+.vite/**
+.next/**
+dist/**
+.dist/**
+generated/**
+cache/**
+.cache/**
+build/**
+.build/**
+target/** 
