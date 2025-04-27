@@ -1,6 +1,9 @@
 import { createSignal, createEffect, onMount, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 import "./index.css";
+import { highlight, languages } from "prismjs";
+import "prismjs/components/prism-bash";
+import "prismjs/themes/prism-tomorrow.css";
 
 // Define the form state type
 type FormState = {
@@ -58,6 +61,18 @@ const presetTemplates = [
   }
 ];
 
+// Add section definitions for quick navigation
+const sections = [
+  { id: "search-section", label: "Search", shortcut: "Alt+1" },
+  { id: "search-location-section", label: "Location", shortcut: "Alt+2" },
+  { id: "match-type-section", label: "Match Type", shortcut: "Alt+3" },
+  { id: "file-size-section", label: "File Size", shortcut: "Alt+4" },
+  { id: "days-ago-section", label: "Days Ago", shortcut: "Alt+5" },
+  { id: "extensions-section", label: "Extensions", shortcut: "Alt+6" },
+  { id: "ignored-dirs-section", label: "Ignored Dirs", shortcut: "Alt+7" },
+  { id: "templates-section", label: "Templates", shortcut: "Alt+8" }
+];
+
 export default function App() {
   // Initialize form state with defaults
   const [formState, setFormState] = createStore<FormState>({
@@ -73,7 +88,11 @@ export default function App() {
   });
 
   const [showCopiedMessage, setShowCopiedMessage] = createSignal(false);
+  const [showGeneratedMessage, setShowGeneratedMessage] = createSignal(false);
+  const [toastMessage, setToastMessage] = createSignal("");
   const [generatedCommand, setGeneratedCommand] = createSignal("");
+  const [highlightedCommand, setHighlightedCommand] = createSignal("");
+  const [activeSection, setActiveSection] = createSignal("");
 
   // Load saved state from localStorage on mount
   onMount(() => {
@@ -95,6 +114,23 @@ export default function App() {
     if (firstInput) {
       firstInput.focus();
     }
+    
+    // Generate command on initial load
+    generateRipgrepCommand();
+
+    // Add intersection observer to track visible sections
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          setActiveSection(entry.target.id);
+        }
+      });
+    }, { threshold: 0.5 });
+
+    sections.forEach(section => {
+      const element = document.getElementById(section.id);
+      if (element) observer.observe(element);
+    });
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
@@ -106,12 +142,32 @@ export default function App() {
     localStorage.setItem("ripgrepHelperState", JSON.stringify(formState));
   });
 
+  // Update highlighted command whenever generated command changes
+  createEffect(() => {
+    const cmd = generatedCommand();
+    if (cmd) {
+      try {
+        const highlighted = highlight(cmd, languages.bash, 'bash');
+        setHighlightedCommand(highlighted);
+      } catch (e) {
+        console.error("Failed to highlight command:", e);
+        setHighlightedCommand(`<span class="token">${cmd}</span>`);
+      }
+    }
+  });
+
   const handleKeyDown = (e: KeyboardEvent) => {
     // Focus search input on '/'
     if (e.key === "/" && !isInputFocused()) {
       e.preventDefault();
       const searchInput = document.getElementById("search-string");
       if (searchInput) searchInput.focus();
+    }
+
+    // Generate command on Enter if not in a textarea or input
+    if (e.key === "Enter" && !isTextareaFocused()) {
+      e.preventDefault();
+      generateRipgrepCommand(true);
     }
 
     // Alt + number shortcuts
@@ -122,12 +178,6 @@ export default function App() {
       if (inputs[index]) {
         (inputs[index] as HTMLElement).focus();
       }
-    }
-
-    // Generate command on Enter if not in a textarea
-    if (e.key === "Enter" && !isTextareaFocused()) {
-      e.preventDefault();
-      generateRipgrepCommand();
     }
   };
 
@@ -147,6 +197,8 @@ export default function App() {
       ...formState,
       ...template.config
     });
+    // Generate command after applying template
+    setTimeout(generateRipgrepCommand, 0);
   };
 
   const toggleExtension = (ext: string, type: "include" | "exclude") => {
@@ -193,6 +245,9 @@ export default function App() {
         }
       }
     }
+    
+    // Generate command after toggling extension
+    setTimeout(generateRipgrepCommand, 0);
   };
 
   const toggleIgnoredDirectory = (dir: string) => {
@@ -206,9 +261,18 @@ export default function App() {
     }
 
     setFormState("ignoredDirectories", ignored);
+    
+    // Generate command after toggling directory
+    setTimeout(generateRipgrepCommand, 0);
   };
 
-  const generateRipgrepCommand = () => {
+  const showToast = (message: string, duration = 3000) => {
+    setToastMessage(message);
+    setShowGeneratedMessage(true);
+    setTimeout(() => setShowGeneratedMessage(false), duration);
+  };
+
+  const generateRipgrepCommand = (shouldShowToast = false) => {
     let command = "rg";
 
     // Search type
@@ -222,45 +286,44 @@ export default function App() {
     // File extensions to include
     if (formState.includedExtensions.length > 0) {
       formState.includedExtensions.forEach(ext => {
-        command += ` -g "*.${ext}"`;
+        command += ` -g '*.${ext}'`;
       });
     }
 
     // File extensions to exclude
     if (formState.excludedExtensions.length > 0) {
       formState.excludedExtensions.forEach(ext => {
-        command += ` -g "!*.${ext}"`;
+        command += ` -g '!*.${ext}'`;
       });
     }
 
     // Ignored directories
     if (formState.ignoredDirectories.length > 0) {
       formState.ignoredDirectories.forEach(dir => {
-        command += ` -g "!${dir}/**"`;
+        command += ` -g '!${dir}/**'`;
       });
     }
 
-    // Max days ago (file modification time)
-    if (formState.maxDaysAgo !== null && formState.maxDaysAgo > 0) {
-      const date = new Date();
-      date.setDate(date.getDate() - formState.maxDaysAgo);
-      const formattedDate = date.toISOString().split('T')[0];
-      command += ` --newer "${formattedDate}"`;
-    }
-
-    // File size constraints
+    // File size constraints - add these BEFORE the search pattern
     if (formState.minFileSize !== null && formState.minFileSize > 0) {
-      command += ` --min-filesize ${formState.minFileSize}`;
+      command += ` --max-filesize ${formState.minFileSize}`;
     }
     if (formState.maxFileSize !== null && formState.maxFileSize > 0) {
       command += ` --max-filesize ${formState.maxFileSize}`;
     }
 
-    // Search string
+    // Max days ago (file modification time)
+    if (formState.maxDaysAgo !== null && formState.maxDaysAgo > 0) {
+      command += " --glob-case-insensitive";
+      const daysInSeconds = formState.maxDaysAgo * 24 * 60 * 60;
+      command += ` -g '!{**/,}*.[mt][ti][mm][ee]<${daysInSeconds}'`; // Removed semicolon
+    }
+
+    // Search string - must be the last argument
     if (formState.searchString) {
-      command += ` "${formState.searchString}"`;
+      command += ` '${formState.searchString}'`;
     } else {
-      command += ` ""`;
+      command += ` '.'`; // Use '.' as default pattern to match any character instead of empty string
     }
 
     // Search location
@@ -268,231 +331,201 @@ export default function App() {
       command += " -l"; // Only print filenames
     } else if (formState.searchLocation === "file") {
       command += ""; // Default behavior searches file contents
-    } else {
-      // Both - no special flags needed
     }
 
-    // Copy to clipboard
-    navigator.clipboard.writeText(command).then(() => {
+    setGeneratedCommand(command);
+    
+    if (shouldShowToast) {
+      navigator.clipboard.writeText(command).then(() => {
+        showToast("Command generated and copied to clipboard! 🚀");
+      });
+    }
+    
+    return command;
+  };
+
+  const handleGenerateClick = () => {
+    generateRipgrepCommand(true);
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(generatedCommand()).then(() => {
       setShowCopiedMessage(true);
       setTimeout(() => setShowCopiedMessage(false), 3000);
     });
+  };
 
-    setGeneratedCommand(command);
-    return command;
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+      setActiveSection(sectionId);
+    }
   };
 
   return (
     <div class="app">
-      <header>
-        <h1>Ripgrep Helper</h1>
-        <p>Build your ripgrep command with a user-friendly interface</p>
-      </header>
+      <h1>Ripgrep Helper</h1>
+      <p class="subtitle">
+        Build powerful ripgrep commands with this interactive UI. Press <kbd class="keyboard-shortcut">/</kbd> to focus search.
+      </p>
 
-      <main>
-        <section class="form-container">
-          <div class="form-group" id="search-section">
-            <label for="search-string">
-              Search String <span class="shortcut">(Alt+1, /)</span>
-            </label>
+      <div class="form-container">
+        <div class="form-group">
+          <label>
+            Search String
+            <span class="shortcut-label">Alt+1</span>
+          </label>
+          <div class="search-input-wrapper">
             <input
               id="search-string"
               type="text"
               value={formState.searchString}
-              onInput={(e) => setFormState("searchString", e.target.value)}
-              placeholder="Enter text to search for..."
-              autofocus
+              onInput={(e) => {
+                setFormState("searchString", e.target.value);
+                generateRipgrepCommand(false);
+              }}
+              placeholder="Enter search term..."
             />
           </div>
+        </div>
 
-          <div class="form-group" id="search-location-section">
-            <label for="search-location">
-              Search Location <span class="shortcut">(Alt+2)</span>
+        <div class="form-group">
+          <label>
+            Search Location
+            <span class="shortcut-label">Alt+2</span>
+          </label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input
+                type="radio"
+                checked={formState.searchLocation === "both"}
+                onChange={() => {
+                  setFormState("searchLocation", "both");
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Both
             </label>
-            <select
-              id="search-location"
-              value={formState.searchLocation}
-              onChange={(e) => setFormState("searchLocation", e.target.value as any)}
-            >
-              <option value="both">Both (folder names and file contents)</option>
-              <option value="folder">Folder names only</option>
-              <option value="file">File contents only</option>
-            </select>
-          </div>
-
-          <div class="form-group" id="match-type-section">
-            <label for="match-type">
-              Match Type <span class="shortcut">(Alt+3)</span>
+            <label class="radio-option">
+              <input
+                type="radio"
+                checked={formState.searchLocation === "folder"}
+                onChange={() => {
+                  setFormState("searchLocation", "folder");
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Folder
             </label>
-            <select
-              id="match-type"
-              value={formState.matchType}
-              onChange={(e) => setFormState("matchType", e.target.value as any)}
-            >
-              <option value="contains">Contains (regex)</option>
-              <option value="exact">Exact match</option>
-            </select>
-          </div>
-
-          <div class="form-group" id="file-size-section">
-            <div class="form-row">
-              <div class="form-col">
-                <label for="min-file-size">
-                  Min File Size (KB) <span class="shortcut">(Alt+4)</span>
-                </label>
-                <input
-                  id="min-file-size"
-                  type="number"
-                  min="0"
-                  value={formState.minFileSize ?? ""}
-                  onInput={(e) => setFormState("minFileSize", e.target.value ? parseInt(e.target.value) : null)}
-                  placeholder="No minimum"
-                />
-              </div>
-              <div class="form-col">
-                <label for="max-file-size">
-                  Max File Size (KB) <span class="shortcut">(Alt+5)</span>
-                </label>
-                <input
-                  id="max-file-size"
-                  type="number"
-                  min="0"
-                  value={formState.maxFileSize ?? ""}
-                  onInput={(e) => setFormState("maxFileSize", e.target.value ? parseInt(e.target.value) : null)}
-                  placeholder="No maximum"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="form-group" id="days-ago-section">
-            <label for="max-days-ago">
-              Max Days Since Modified <span class="shortcut">(Alt+6)</span>
+            <label class="radio-option">
+              <input
+                type="radio"
+                checked={formState.searchLocation === "file"}
+                onChange={() => {
+                  setFormState("searchLocation", "file");
+                  generateRipgrepCommand(false);
+                }}
+              />
+              File
             </label>
-            <input
-              id="max-days-ago"
-              type="number"
-              min="0"
-              value={formState.maxDaysAgo ?? ""}
-              onInput={(e) => setFormState("maxDaysAgo", e.target.value ? parseInt(e.target.value) : null)}
-              placeholder="Any time"
-            />
           </div>
+        </div>
 
-          <div class="form-group" id="extensions-section">
-            <label>
-              File Extensions <span class="shortcut">(Alt+7)</span>
+        <div class="form-group">
+          <label>
+            Match Type
+            <span class="shortcut-label">Alt+3</span>
+          </label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input
+                type="radio"
+                checked={formState.matchType === "contains"}
+                onChange={() => {
+                  setFormState("matchType", "contains");
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Contains
             </label>
-            <div class="extensions-container">
-              <div class="extensions-column">
-                <h4>Include Extensions</h4>
-                <div class="extension-buttons">
-                  <For each={commonExtensions}>
-                    {(ext) => (
-                      <button
-                        type="button"
-                        classList={{
-                          "extension-btn": true,
-                          "selected": formState.includedExtensions.includes(ext)
-                        }}
-                        onClick={() => toggleExtension(ext, "include")}
-                      >
-                        {ext}
-                      </button>
-                    )}
-                  </For>
-                </div>
-              </div>
-              <div class="extensions-column">
-                <h4>Exclude Extensions</h4>
-                <div class="extension-buttons">
-                  <For each={commonExtensions}>
-                    {(ext) => (
-                      <button
-                        type="button"
-                        classList={{
-                          "extension-btn": true,
-                          "exclude-selected": formState.excludedExtensions.includes(ext)
-                        }}
-                        onClick={() => toggleExtension(ext, "exclude")}
-                      >
-                        {ext}
-                      </button>
-                    )}
-                  </For>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="form-group" id="ignored-dirs-section">
-            <label>
-              Ignored Directories <span class="shortcut">(Alt+8)</span>
+            <label class="radio-option">
+              <input
+                type="radio"
+                checked={formState.matchType === "exact"}
+                onChange={() => {
+                  setFormState("matchType", "exact");
+                  generateRipgrepCommand(false);
+                }}
+              />
+              Exact
             </label>
-            <div class="ignored-dirs-container">
-              <For each={defaultIgnoredDirs}>
-                {(dir) => (
-                  <button
-                    type="button"
-                    classList={{
-                      "dir-btn": true,
-                      "selected": formState.ignoredDirectories.includes(dir)
-                    }}
-                    onClick={() => toggleIgnoredDirectory(dir)}
-                  >
-                    {dir}
-                  </button>
-                )}
-              </For>
-            </div>
           </div>
+        </div>
 
-          <div class="form-group" id="templates-section">
-            <label>
-              Preset Templates <span class="shortcut">(Alt+9)</span>
-            </label>
-            <div class="templates-container">
-              <For each={presetTemplates}>
-                {(template, index) => (
-                  <button
-                    type="button"
-                    class="template-btn"
-                    onClick={() => applyTemplate(index())}
-                  >
-                    {template.name}
-                  </button>
-                )}
-              </For>
-            </div>
+        <div class="form-group">
+          <label>
+            Include Extensions
+            <span class="shortcut-label">Alt+4</span>
+          </label>
+          <div class="extensions-grid">
+            <For each={commonExtensions}>
+              {(ext) => (
+                <button
+                  type="button"
+                  class="extension-btn"
+                  classList={{ selected: formState.includedExtensions.includes(ext) }}
+                  onClick={() => toggleExtension(ext, "include")}
+                >
+                  {ext}
+                </button>
+              )}
+            </For>
           </div>
+        </div>
 
-          <div class="form-actions">
-            <button
-              type="button"
-              class="generate-btn"
-              onClick={generateRipgrepCommand}
-            >
-              Generate Command (Enter)
-            </button>
+        <div class="form-group">
+          <label>
+            Exclude Extensions
+            <span class="shortcut-label">Alt+5</span>
+          </label>
+          <div class="extensions-grid">
+            <For each={commonExtensions}>
+              {(ext) => (
+                <button
+                  type="button"
+                  class="extension-btn"
+                  classList={{ selected: formState.excludedExtensions.includes(ext) }}
+                  onClick={() => toggleExtension(ext, "exclude")}
+                >
+                  {ext}
+                </button>
+              )}
+            </For>
           </div>
-        </section>
+        </div>
 
         <Show when={generatedCommand()}>
-          <section class="result-section">
-            <h3>Generated Command:</h3>
-            <div class="command-display">
-              <code>{generatedCommand()}</code>
-            </div>
-            <div class="copy-message" classList={{ "visible": showCopiedMessage() }}>
-              Command copied to clipboard!
-            </div>
-          </section>
+          <div class="command-output">
+            <div innerHTML={highlightedCommand()}></div>
+          </div>
         </Show>
-      </main>
 
-      <footer>
-        <p>Keyboard Shortcuts: Press / to focus search, Alt+1-9 for form sections, Enter to generate</p>
-      </footer>
+        <button class="generate-btn" onClick={handleGenerateClick}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 16.7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7.3a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v7.4Z"></path>
+          </svg>
+          Generate Command
+        </button>
+      </div>
+
+      <div class="keyboard-hint">
+        Press <kbd>/</kbd> to focus search • Press <kbd>Enter</kbd> to generate
+      </div>
+
+      <div class="toast" classList={{ visible: showGeneratedMessage() }}>
+        {toastMessage()}
+      </div>
     </div>
   );
 }
