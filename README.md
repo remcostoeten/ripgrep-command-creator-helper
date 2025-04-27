@@ -1,8 +1,64 @@
-## Usage
+# 🔍 Ripgrep Helper UI
 
-Those templates dependencies are maintained via [pnpm](https://pnpm.io) via `pnpm up -Lri`.
+A modern, interactive web interface for building powerful ripgrep commands. Built with SolidJS and styled with a GitHub Dark-inspired theme.
 
-This is the reason you see a `pnpm-lock.yaml`. That being said, any package manager will work. This file can be safely be removed once you clone a template.
+![Ripgrep Helper UI](https://raw.githubusercontent.com/remcostoeten/ripgrep-helperr/main/src/assets/preview.png)
+
+## ✨ Features
+
+- 🎯 Interactive UI for building ripgrep commands
+- 🎨 Beautiful GitHub Dark-inspired theme
+- ⚡ Real-time command generation
+- 🔥 Preset filters for common use cases:
+  - Web Development (JS/TS, CSS, HTML)
+  - Documentation (MD, TXT, RST)
+  - Configuration Files (JSON, YAML, ENV)
+  - Images (JPG, PNG, SVG)
+  - Backend Code (Python, Ruby, Java)
+- ⌨️ Keyboard shortcuts for quick navigation
+- 💾 Automatic state persistence
+- 📱 Responsive design for all screen sizes
+
+## 🚀 Quick Start
+
+1. Clone the repository:
+```bash
+git clone https://github.com/remcostoeten/ripgrep-helperr.git
+cd ripgrep-helperr
+```
+
+2. Install dependencies:
+```bash
+pnpm install
+```
+
+3. Start the development server:
+```bash
+pnpm dev
+```
+
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+## 🛠️ Built With
+
+- [SolidJS](https://www.solidjs.com/) - A declarative JavaScript library for building user interfaces
+- [Vite](https://vitejs.dev/) - Next Generation Frontend Tooling
+- [PrismJS](https://prismjs.com/) - Syntax highlighting
+- [TypeScript](https://www.typescriptlang.org/) - Type safety and better developer experience
+
+## 📦 Production Build
+
+To create a production build:
+
+```bash
+pnpm build
+```
+
+The build artifacts will be stored in the `dist/` directory.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ```bash
 $ npm install # or pnpm install or yarn install
