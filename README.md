@@ -20,17 +20,20 @@ A modern, interactive web interface for building powerful ripgrep commands. Buil
 ## 🚀 Quick Start
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/remcostoeten/ripgrep-helperr.git
 cd ripgrep-helperr
 ```
 
 2. Install dependencies:
+
 ```bash
 pnpm install
 ```
 
 3. Start the development server:
+
 ```bash
 pnpm dev
 ```

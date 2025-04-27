@@ -1,145 +1,210 @@
-import { createSignal, createEffect, onMount, For, Show } from "solid-js";
-import { createStore } from "solid-js/store";
-import "./index.css";
-import { highlight, languages } from "prismjs";
-import "prismjs/components/prism-bash";
-import "prismjs/themes/prism-tomorrow.css";
+import { createSignal, createEffect, onMount, For, Show } from 'solid-js';
+import { createStore } from 'solid-js/store';
+import './index.css';
+import { highlight, languages } from 'prismjs';
+import 'prismjs/components/prism-bash';
+import 'prismjs/themes/prism-tomorrow.css';
 
 // Define the form state type
 type FormState = {
-  searchLocation: "folder" | "file" | "both";
+  searchLocation: 'folder' | 'file' | 'both';
   searchString: string;
-  matchType: "exact" | "contains";
+  matchType: 'exact' | 'contains';
   includedExtensions: string[];
   excludedExtensions: string[];
   maxDaysAgo: number | null;
   maxFileSize: number | null;
   minFileSize: number | null;
   ignoredDirectories: string[];
+  excludedFolders: string[];
 };
 
 // Common file extensions
 const commonExtensions = [
-  "js", "ts", "jsx", "tsx", "css", "scss", "html", "md", "json", "yaml", "yml",
-  "py", "rb", "go", "rs", "java", "php", "c", "cpp", "h", "sh", "txt"
+  'js',
+  'ts',
+  'jsx',
+  'tsx',
+  'css',
+  'scss',
+  'html',
+  'md',
+  'json',
+  'yaml',
+  'yml',
+  'py',
+  'rb',
+  'go',
+  'rs',
+  'java',
+  'php',
+  'c',
+  'cpp',
+  'h',
+  'sh',
+  'txt',
+];
+
+// Common folders to exclude
+const commonFolders = [
+  'node_modules',
+  'dist',
+  '.git',
+  'build',
+  'coverage',
+  'tmp',
+  'temp',
+  'logs',
+  'public',
+  'assets',
+  'vendor',
+  'public',
+  'static',
+  'venv',
+  'cache',
+  '.cache',
+  '.vscode',
+  '.idea',
 ];
 
 // Default ignored directories
 const defaultIgnoredDirs = [
-  "node_modules", ".git", ".vite", ".next", "dist", ".dist",
-  "generated", "cache", ".cache", "build", ".build", "target"
+  'node_modules',
+  '.git',
+  '.vite',
+  '.next',
+  'dist',
+  '.dist',
+  'generated',
+  'cache',
+  '.cache',
+  'build',
+  '.build',
+  'target',
+  'vendor',
+  'public',
+  'static',
+  'venv',
+  'cache',
+  '.cache',
 ];
 
 // Preset templates
 const presetTemplates = [
   {
-    name: "JavaScript/TypeScript",
+    name: 'JavaScript/TypeScript',
     config: {
-      searchLocation: "both" as const,
-      includedExtensions: ["js", "ts", "jsx", "tsx"],
+      searchLocation: 'both' as const,
+      includedExtensions: ['js', 'ts', 'jsx', 'tsx'],
       excludedExtensions: [],
-      ignoredDirectories: [...defaultIgnoredDirs]
-    }
+      ignoredDirectories: [...defaultIgnoredDirs],
+    },
   },
   {
-    name: "Documentation",
+    name: 'Documentation',
     config: {
-      searchLocation: "file" as const,
-      includedExtensions: ["md", "txt", "pdf"],
+      searchLocation: 'file' as const,
+      includedExtensions: ['md', 'txt', 'pdf'],
       excludedExtensions: [],
-      ignoredDirectories: [...defaultIgnoredDirs]
-    }
+      ignoredDirectories: [...defaultIgnoredDirs],
+    },
   },
   {
-    name: "Configuration Files",
+    name: 'Configuration Files',
     config: {
-      searchLocation: "folder" as const,
-      includedExtensions: ["json", "yaml", "yml", "toml", "ini", "env"],
+      searchLocation: 'folder' as const,
+      includedExtensions: ['json', 'yaml', 'yml', 'toml', 'ini', 'env'],
       excludedExtensions: [],
-      ignoredDirectories: [...defaultIgnoredDirs]
-    }
-  }
+      ignoredDirectories: [...defaultIgnoredDirs],
+    },
+  },
 ];
 
 // Add section definitions for quick navigation
 const sections = [
-  { id: "search-section", label: "Search", shortcut: "Alt+1" },
-  { id: "search-location-section", label: "Location", shortcut: "Alt+2" },
-  { id: "match-type-section", label: "Match Type", shortcut: "Alt+3" },
-  { id: "file-size-section", label: "File Size", shortcut: "Alt+4" },
-  { id: "days-ago-section", label: "Days Ago", shortcut: "Alt+5" },
-  { id: "extensions-section", label: "Extensions", shortcut: "Alt+6" },
-  { id: "ignored-dirs-section", label: "Ignored Dirs", shortcut: "Alt+7" },
-  { id: "templates-section", label: "Templates", shortcut: "Alt+8" }
+  { id: 'search-section', label: 'Search', shortcut: 'Alt+1' },
+  { id: 'search-location-section', label: 'Location', shortcut: 'Alt+2' },
+  { id: 'match-type-section', label: 'Match Type', shortcut: 'Alt+3' },
+  { id: 'file-size-section', label: 'File Size', shortcut: 'Alt+4' },
+  { id: 'days-ago-section', label: 'Days Ago', shortcut: 'Alt+5' },
+  { id: 'extensions-section', label: 'Extensions', shortcut: 'Alt+6' },
+  { id: 'ignored-dirs-section', label: 'Ignored Dirs', shortcut: 'Alt+7' },
+  { id: 'templates-section', label: 'Templates', shortcut: 'Alt+8' },
+  { id: 'exclude-folders-section', label: 'Exclude Folders', shortcut: 'Alt+9' },
 ];
 
 export default function App() {
   // Initialize form state with defaults
   const [formState, setFormState] = createStore<FormState>({
-    searchLocation: "both",
-    searchString: "",
-    matchType: "contains",
+    searchLocation: 'both',
+    searchString: '',
+    matchType: 'contains',
     includedExtensions: [],
     excludedExtensions: [],
     maxDaysAgo: null,
     maxFileSize: null,
     minFileSize: null,
-    ignoredDirectories: [...defaultIgnoredDirs]
+    ignoredDirectories: [...defaultIgnoredDirs],
+    excludedFolders: [],
   });
 
   const [showCopiedMessage, setShowCopiedMessage] = createSignal(false);
   const [showGeneratedMessage, setShowGeneratedMessage] = createSignal(false);
-  const [toastMessage, setToastMessage] = createSignal("");
-  const [generatedCommand, setGeneratedCommand] = createSignal("");
-  const [highlightedCommand, setHighlightedCommand] = createSignal("");
-  const [activeSection, setActiveSection] = createSignal("");
+  const [toastMessage, setToastMessage] = createSignal('');
+  const [generatedCommand, setGeneratedCommand] = createSignal('');
+  const [highlightedCommand, setHighlightedCommand] = createSignal('');
+  const [activeSection, setActiveSection] = createSignal('');
+  const [newFolderInput, setNewFolderInput] = createSignal('');
 
   // Load saved state from localStorage on mount
   onMount(() => {
-    const savedState = localStorage.getItem("ripgrepHelperState");
+    const savedState = localStorage.getItem('ripgrepHelperState');
     if (savedState) {
       try {
         const parsedState = JSON.parse(savedState);
         setFormState(parsedState);
       } catch (e) {
-        console.error("Failed to parse saved state:", e);
+        console.error('Failed to parse saved state:', e);
       }
     }
 
     // Set up keyboard shortcuts
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
 
     // Auto focus the first input
-    const firstInput = document.getElementById("search-string");
+    const firstInput = document.getElementById('search-string');
     if (firstInput) {
       firstInput.focus();
     }
-    
+
     // Generate command on initial load
     generateRipgrepCommand();
 
     // Add intersection observer to track visible sections
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          setActiveSection(entry.target.id);
-        }
-      });
-    }, { threshold: 0.5 });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setActiveSection(entry.target.id);
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
 
-    sections.forEach(section => {
+    sections.forEach((section) => {
       const element = document.getElementById(section.id);
       if (element) observer.observe(element);
     });
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   });
 
   // Save state to localStorage whenever it changes
   createEffect(() => {
-    localStorage.setItem("ripgrepHelperState", JSON.stringify(formState));
+    localStorage.setItem('ripgrepHelperState', JSON.stringify(formState));
   });
 
   // Update highlighted command whenever generated command changes
@@ -150,7 +215,7 @@ export default function App() {
         const highlighted = highlight(cmd, languages.bash, 'bash');
         setHighlightedCommand(highlighted);
       } catch (e) {
-        console.error("Failed to highlight command:", e);
+        console.error('Failed to highlight command:', e);
         setHighlightedCommand(`<span class="token">${cmd}</span>`);
       }
     }
@@ -158,14 +223,14 @@ export default function App() {
 
   const handleKeyDown = (e: KeyboardEvent) => {
     // Focus search input on '/'
-    if (e.key === "/" && !isInputFocused()) {
+    if (e.key === '/' && !isInputFocused()) {
       e.preventDefault();
-      const searchInput = document.getElementById("search-string");
+      const searchInput = document.getElementById('search-string');
       if (searchInput) searchInput.focus();
     }
 
     // Generate command on Enter if not in a textarea or input
-    if (e.key === "Enter" && !isTextareaFocused()) {
+    if (e.key === 'Enter' && !isTextareaFocused()) {
       e.preventDefault();
       generateRipgrepCommand(true);
     }
@@ -174,7 +239,7 @@ export default function App() {
     if (e.altKey && !isNaN(parseInt(e.key)) && parseInt(e.key) >= 1 && parseInt(e.key) <= 9) {
       e.preventDefault();
       const index = parseInt(e.key) - 1;
-      const inputs = document.querySelectorAll("input, select");
+      const inputs = document.querySelectorAll('input, select');
       if (inputs[index]) {
         (inputs[index] as HTMLElement).focus();
       }
@@ -182,9 +247,11 @@ export default function App() {
   };
 
   const isInputFocused = () => {
-    return document.activeElement instanceof HTMLInputElement ||
+    return (
+      document.activeElement instanceof HTMLInputElement ||
       document.activeElement instanceof HTMLSelectElement ||
-      document.activeElement instanceof HTMLTextAreaElement;
+      document.activeElement instanceof HTMLTextAreaElement
+    );
   };
 
   const isTextareaFocused = () => {
@@ -195,14 +262,14 @@ export default function App() {
     const template = presetTemplates[templateIndex];
     setFormState({
       ...formState,
-      ...template.config
+      ...template.config,
     });
     // Generate command after applying template
     setTimeout(generateRipgrepCommand, 0);
   };
 
-  const toggleExtension = (ext: string, type: "include" | "exclude") => {
-    if (type === "include") {
+  const toggleExtension = (ext: string, type: 'include' | 'exclude') => {
+    if (type === 'include') {
       const included = [...formState.includedExtensions];
       const index = included.indexOf(ext);
 
@@ -212,7 +279,7 @@ export default function App() {
         included.splice(index, 1);
       }
 
-      setFormState("includedExtensions", included);
+      setFormState('includedExtensions', included);
 
       // Remove from excluded if it's being included
       if (index === -1) {
@@ -220,7 +287,7 @@ export default function App() {
         const excludedIndex = excluded.indexOf(ext);
         if (excludedIndex !== -1) {
           excluded.splice(excludedIndex, 1);
-          setFormState("excludedExtensions", excluded);
+          setFormState('excludedExtensions', excluded);
         }
       }
     } else {
@@ -233,7 +300,7 @@ export default function App() {
         excluded.splice(index, 1);
       }
 
-      setFormState("excludedExtensions", excluded);
+      setFormState('excludedExtensions', excluded);
 
       // Remove from included if it's being excluded
       if (index === -1) {
@@ -241,12 +308,32 @@ export default function App() {
         const includedIndex = included.indexOf(ext);
         if (includedIndex !== -1) {
           included.splice(includedIndex, 1);
-          setFormState("includedExtensions", included);
+          setFormState('includedExtensions', included);
         }
       }
     }
-    
+
     // Generate command after toggling extension
+    setTimeout(generateRipgrepCommand, 0);
+  };
+
+  const toggleAllExtensions = (type: 'include' | 'exclude', select: boolean) => {
+    if (type === 'include') {
+      if (select) {
+        setFormState('includedExtensions', [...commonExtensions]);
+        setFormState('excludedExtensions', []);
+      } else {
+        setFormState('includedExtensions', []);
+      }
+    } else {
+      if (select) {
+        setFormState('excludedExtensions', [...commonExtensions]);
+        setFormState('includedExtensions', []);
+      } else {
+        setFormState('excludedExtensions', []);
+      }
+    }
+    // Generate command after toggling all extensions
     setTimeout(generateRipgrepCommand, 0);
   };
 
@@ -260,9 +347,42 @@ export default function App() {
       ignored.splice(index, 1);
     }
 
-    setFormState("ignoredDirectories", ignored);
-    
+    setFormState('ignoredDirectories', ignored);
+
     // Generate command after toggling directory
+    setTimeout(generateRipgrepCommand, 0);
+  };
+
+  const toggleFolder = (folder: string) => {
+    const excluded = [...formState.excludedFolders];
+    const index = excluded.indexOf(folder);
+
+    if (index === -1) {
+      excluded.push(folder);
+    } else {
+      excluded.splice(index, 1);
+    }
+
+    setFormState('excludedFolders', excluded);
+    setTimeout(generateRipgrepCommand, 0);
+  };
+
+  const addCustomFolder = (e: Event) => {
+    e.preventDefault();
+    const folder = newFolderInput().trim();
+    if (folder && !formState.excludedFolders.includes(folder)) {
+      setFormState('excludedFolders', [...formState.excludedFolders, folder]);
+      setNewFolderInput('');
+      setTimeout(generateRipgrepCommand, 0);
+    }
+  };
+
+  const toggleAllFolders = (select: boolean) => {
+    if (select) {
+      setFormState('excludedFolders', [...commonFolders]);
+    } else {
+      setFormState('excludedFolders', []);
+    }
     setTimeout(generateRipgrepCommand, 0);
   };
 
@@ -273,33 +393,33 @@ export default function App() {
   };
 
   const generateRipgrepCommand = (shouldShowToast = false) => {
-    let command = "rg";
+    let command = 'rg';
 
     // Search type
-    if (formState.matchType === "exact") {
-      command += " -F"; // Fixed strings, no regex
+    if (formState.matchType === 'exact') {
+      command += ' -F'; // Fixed strings, no regex
     }
 
     // Case sensitivity (default is case-sensitive)
-    command += " -s";
+    command += ' -s';
 
     // File extensions to include
     if (formState.includedExtensions.length > 0) {
-      formState.includedExtensions.forEach(ext => {
+      formState.includedExtensions.forEach((ext) => {
         command += ` -g '*.${ext}'`;
       });
     }
 
     // File extensions to exclude
     if (formState.excludedExtensions.length > 0) {
-      formState.excludedExtensions.forEach(ext => {
+      formState.excludedExtensions.forEach((ext) => {
         command += ` -g '!*.${ext}'`;
       });
     }
 
     // Ignored directories
     if (formState.ignoredDirectories.length > 0) {
-      formState.ignoredDirectories.forEach(dir => {
+      formState.ignoredDirectories.forEach((dir) => {
         command += ` -g '!${dir}/**'`;
       });
     }
@@ -314,7 +434,7 @@ export default function App() {
 
     // Max days ago (file modification time)
     if (formState.maxDaysAgo !== null && formState.maxDaysAgo > 0) {
-      command += " --glob-case-insensitive";
+      command += ' --glob-case-insensitive';
       const daysInSeconds = formState.maxDaysAgo * 24 * 60 * 60;
       command += ` -g '!{**/,}*.[mt][ti][mm][ee]<${daysInSeconds}'`; // Removed semicolon
     }
@@ -327,20 +447,27 @@ export default function App() {
     }
 
     // Search location
-    if (formState.searchLocation === "folder") {
-      command += " -l"; // Only print filenames
-    } else if (formState.searchLocation === "file") {
-      command += ""; // Default behavior searches file contents
+    if (formState.searchLocation === 'folder') {
+      command += ' -l'; // Only print filenames
+    } else if (formState.searchLocation === 'file') {
+      command += ''; // Default behavior searches file contents
+    }
+
+    // Add excluded folders
+    if (formState.excludedFolders.length > 0) {
+      formState.excludedFolders.forEach((folder) => {
+        command += ` -g '!${folder}/**'`;
+      });
     }
 
     setGeneratedCommand(command);
-    
+
     if (shouldShowToast) {
       navigator.clipboard.writeText(command).then(() => {
-        showToast("Command generated and copied to clipboard! 🚀");
+        showToast('Command generated and copied to clipboard! 🚀');
       });
     }
-    
+
     return command;
   };
 
@@ -358,7 +485,7 @@ export default function App() {
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
     if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setActiveSection(sectionId);
     }
   };
@@ -367,7 +494,9 @@ export default function App() {
     <div class="app">
       <h1>Ripgrep Helper</h1>
       <p class="subtitle">
-        Build powerful ripgrep commands with this interactive UI. Press <kbd class="keyboard-shortcut">/</kbd> to focus search. Press <kbd class="keyboard-shortcut">Enter</kbd> to generate to clipboard.
+        Build powerful ripgrep commands with this interactive UI. Press{' '}
+        <kbd class="keyboard-shortcut">/</kbd> to focus search. Press{' '}
+        <kbd class="keyboard-shortcut">Enter</kbd> to generate to clipboard.
       </p>
       <div class="form-container">
         <div class="form-group">
@@ -381,7 +510,7 @@ export default function App() {
               type="text"
               value={formState.searchString}
               onInput={(e) => {
-                setFormState("searchString", e.target.value);
+                setFormState('searchString', e.target.value);
                 generateRipgrepCommand(false);
               }}
               placeholder="Enter search term..."
@@ -398,9 +527,9 @@ export default function App() {
             <label class="radio-option">
               <input
                 type="radio"
-                checked={formState.searchLocation === "both"}
+                checked={formState.searchLocation === 'both'}
                 onChange={() => {
-                  setFormState("searchLocation", "both");
+                  setFormState('searchLocation', 'both');
                   generateRipgrepCommand(false);
                 }}
               />
@@ -409,9 +538,9 @@ export default function App() {
             <label class="radio-option">
               <input
                 type="radio"
-                checked={formState.searchLocation === "folder"}
+                checked={formState.searchLocation === 'folder'}
                 onChange={() => {
-                  setFormState("searchLocation", "folder");
+                  setFormState('searchLocation', 'folder');
                   generateRipgrepCommand(false);
                 }}
               />
@@ -420,9 +549,9 @@ export default function App() {
             <label class="radio-option">
               <input
                 type="radio"
-                checked={formState.searchLocation === "file"}
+                checked={formState.searchLocation === 'file'}
                 onChange={() => {
-                  setFormState("searchLocation", "file");
+                  setFormState('searchLocation', 'file');
                   generateRipgrepCommand(false);
                 }}
               />
@@ -440,9 +569,9 @@ export default function App() {
             <label class="radio-option">
               <input
                 type="radio"
-                checked={formState.matchType === "contains"}
+                checked={formState.matchType === 'contains'}
                 onChange={() => {
-                  setFormState("matchType", "contains");
+                  setFormState('matchType', 'contains');
                   generateRipgrepCommand(false);
                 }}
               />
@@ -451,9 +580,9 @@ export default function App() {
             <label class="radio-option">
               <input
                 type="radio"
-                checked={formState.matchType === "exact"}
+                checked={formState.matchType === 'exact'}
                 onChange={() => {
-                  setFormState("matchType", "exact");
+                  setFormState('matchType', 'exact');
                   generateRipgrepCommand(false);
                 }}
               />
@@ -467,6 +596,22 @@ export default function App() {
             Include Extensions
             <span class="shortcut-label">Alt+4</span>
           </label>
+          <div class="extensions-controls">
+            <button
+              type="button"
+              class="select-all-btn"
+              onClick={() => toggleAllExtensions('include', true)}
+            >
+              Select All
+            </button>
+            <button
+              type="button"
+              class="select-all-btn"
+              onClick={() => toggleAllExtensions('include', false)}
+            >
+              Clear All
+            </button>
+          </div>
           <div class="extensions-grid">
             <For each={commonExtensions}>
               {(ext) => (
@@ -474,7 +619,7 @@ export default function App() {
                   type="button"
                   class="extension-btn"
                   classList={{ selected: formState.includedExtensions.includes(ext) }}
-                  onClick={() => toggleExtension(ext, "include")}
+                  onClick={() => toggleExtension(ext, 'include')}
                 >
                   {ext}
                 </button>
@@ -488,6 +633,22 @@ export default function App() {
             Exclude Extensions
             <span class="shortcut-label">Alt+5</span>
           </label>
+          <div class="extensions-controls">
+            <button
+              type="button"
+              class="select-all-btn"
+              onClick={() => toggleAllExtensions('exclude', true)}
+            >
+              Select All
+            </button>
+            <button
+              type="button"
+              class="select-all-btn"
+              onClick={() => toggleAllExtensions('exclude', false)}
+            >
+              Clear All
+            </button>
+          </div>
           <div class="extensions-grid">
             <For each={commonExtensions}>
               {(ext) => (
@@ -495,13 +656,65 @@ export default function App() {
                   type="button"
                   class="extension-btn"
                   classList={{ selected: formState.excludedExtensions.includes(ext) }}
-                  onClick={() => toggleExtension(ext, "exclude")}
+                  onClick={() => toggleExtension(ext, 'exclude')}
                 >
                   {ext}
                 </button>
               )}
             </For>
           </div>
+        </div>
+
+        <div class="form-group">
+          <label>
+            Exclude Folders
+            <span class="shortcut-label">Alt+9</span>
+          </label>
+          <div class="extensions-controls">
+            <button type="button" class="select-all-btn" onClick={() => toggleAllFolders(true)}>
+              Select All
+            </button>
+            <button type="button" class="select-all-btn" onClick={() => toggleAllFolders(false)}>
+              Clear All
+            </button>
+          </div>
+          <div class="folders-grid">
+            <For each={commonFolders}>
+              {(folder) => (
+                <button
+                  type="button"
+                  class="folder-btn"
+                  classList={{ selected: formState.excludedFolders.includes(folder) }}
+                  onClick={() => toggleFolder(folder)}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                  {folder}
+                </button>
+              )}
+            </For>
+          </div>
+          <form class="add-folder-form" onSubmit={addCustomFolder}>
+            <input
+              type="text"
+              class="add-folder-input"
+              value={newFolderInput()}
+              onInput={(e) => setNewFolderInput(e.currentTarget.value)}
+              placeholder="Add custom folder..."
+            />
+            <button type="submit" class="add-folder-btn">
+              Add
+            </button>
+          </form>
         </div>
 
         <Show when={generatedCommand()}>
@@ -511,16 +724,30 @@ export default function App() {
         </Show>
 
         <button class="generate-btn" onClick={handleGenerateClick}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M20 16.7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7.3a2 2 0 0 1 2-2h3l2 2h7a2 2 0 0 1 2 2v7.4Z"></path>
           </svg>
           Generate Command
         </button>
 
-      <div class="keyboard-hint">
-        Press <kbd>/</kbd> to focus search • Press <kbd>Enter</kbd> to generate
-      <p>Built by <a href="https://github.com/remcostoeten">Remco Stoeten</a> <span> utilizing </span><kbd>Solid.JS</kbd>   </p>
-      </div>
+        <div class="keyboard-hint">
+          Press <kbd>/</kbd> to focus search • Press <kbd>Enter</kbd> to generate
+          <p>
+            Built by <a href="https://github.com/remcostoeten">Remco Stoeten</a>{' '}
+            <span> utilizing </span>
+            <kbd>Solid.JS</kbd>{' '}
+          </p>
+        </div>
       </div>
 
       <div class="toast" classList={{ visible: showGeneratedMessage() }}>
