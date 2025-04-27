@@ -1,0 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins&display=swap');
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.font-sans {
+  font-family: 'Poppins', sans-serif;
+}
+
+input,
+textarea,
+kbd,
+select,
+button {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.radio-option:has(input:checked) {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+html:not(kbd, select, button, input, textarea) {
+  font-family: 'Poppins', sans-serif;
+}
